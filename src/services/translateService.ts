@@ -10,7 +10,8 @@ export class TranslateService {
     }
 
     async translateText(text: string, targetLanguage: string, sourceLanguage?: string): Promise<string> {
-        const chunks = this.chunkBySentence(text, 500); // keep each chunk shorter for model limits
+        // Keep chunks short to avoid model truncation; 250 is safer than 500 for long legal text blocks.
+        const chunks = this.chunkBySentence(text, 250);
         const translatedParts: string[] = [];
 
         for (const chunk of chunks) {
@@ -37,7 +38,7 @@ export class TranslateService {
     }
 
     // Simple sentence-based chunking to reduce truncation; merges sentences until maxLength reached.
-    private chunkBySentence(text: string, maxLength: number): string[] {
+        private chunkBySentence(text: string, maxLength: number): string[] {
         const sentences = text
             .split(/(?<=[\.\!\?。！？])/)
             .map(s => s.trim())
@@ -46,28 +47,40 @@ export class TranslateService {
         const chunks: string[] = [];
         let current = '';
 
+        const pushChunk = (value: string) => {
+            const trimmed = value.trim();
+            if (trimmed.length > 0) chunks.push(trimmed);
+        };
+
+        const forceSplit = (segment: string) => {
+            let idx = 0;
+            while (idx < segment.length) {
+                pushChunk(segment.slice(idx, idx + maxLength));
+                idx += maxLength;
+            }
+        };
+
         for (const sentence of sentences) {
+            if (sentence.length > maxLength) {
+                // current unfinished chunk first
+                pushChunk(current);
+                current = '';
+                forceSplit(sentence);
+                continue;
+            }
             if ((current + ' ' + sentence).trim().length > maxLength && current.length > 0) {
-                chunks.push(current.trim());
+                pushChunk(current);
                 current = sentence;
             } else {
                 current = (current + ' ' + sentence).trim();
             }
         }
 
-        if (current.length > 0) {
-            chunks.push(current.trim());
-        }
+        pushChunk(current);
 
         // Fallback: if no sentence delimiters found, split by raw length
         if (chunks.length === 0) {
-            const parts: string[] = [];
-            let index = 0;
-            while (index < text.length) {
-                parts.push(text.slice(index, index + maxLength));
-                index += maxLength;
-            }
-            return parts;
+            forceSplit(text);
         }
 
         return chunks;
