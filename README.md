@@ -8,7 +8,7 @@ This project is a translation backend built using Cloudflare Workers. It provide
 - `src/config.ts`: Contains configuration options such as the default Workers AI model name used by the translation service.
 - `src/services/translateService.ts`: Exports the `TranslateService` class, which includes the `translateText` method for translating text based on the target language.
 - `src/routes/index.ts`: Exports `handleRoutes`, a Cloudflare Worker–style router handling `POST /translate` and validating input.
-- `src/koreader/translate.lua`: Lua script for Koreader that calls the Cloudflare Worker API for translation and processes the results.
+- `src/koreader/translator.lua`: Lua script for KOReader, compatible with the original translator module but using the custom backend.
 
 ## Setup
 
@@ -48,23 +48,41 @@ Once deployed, you can use the translation API by sending a POST request to the 
 ```json
 {
   "text": "Hello, world!",
-  "targetLanguage": "es"
+  "targetLanguage": "ja"
 }
 ```
 
 The response will contain the translated text.
 
+### HTTP API
+
+- **Endpoint:** `POST /translate`
+- **Headers:** `Content-Type: application/json`
+- **Request body:**
+   - `text` (string, required): source text.
+   - `targetLanguage` (string, required): target language code (e.g. `en`, `zh`, `fr`).
+   - `sourceLanguage` (string, optional): source language code. If omitted/empty, Workers AI will auto-detect.
+- **Response 200 JSON:**
+   ```json
+   {
+      "translatedText": "你好，世界！",
+      "sourceLanguage": "en" // optional, if provided by upstream
+   }
+   ```
+- **Errors:**
+   - `400` invalid JSON or missing required fields.
+   - `404` path/method not matched.
+   - `500` upstream translation failure.
+
 ### Local test via curl
 
 ```bash
-curl -X POST "http://127.0.0.1:8787/translate" ^
-   -H "Content-Type: application/json" ^
-   -d "{\"text\":\"Hello\",\"targetLanguage\":\"zh\"}"
+curl -X POST "http://127.0.0.1:8787/translate" -H "Content-Type: application/json" -d '{"text":"Hello","targetLanguage":"zh"}'
 ```
 
 ## Koreader Integration
 
-To use the translation service in Koreader, include the `src/koreader/translate.lua` script in your Koreader setup. This script will handle the API calls to the Cloudflare Worker and return the translated results.
+To use the translation service in KOReader, place `src/koreader/translator.lua` into KOReader (can be used as a drop-in for the original translator). Update `CUSTOM_ENDPOINT` inside the file to your deployed Worker URL. It preserves the original UI/menus and only swaps the network call to POST the same JSON as above.
 
 ## License
 
