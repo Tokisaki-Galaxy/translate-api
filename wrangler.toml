@@ -1,0 +1,6 @@
+name = "translate-api"
+main = "src/worker.ts"
+tsconfig = "./tsconfig.json"
+compatibility_date = "2024-12-16"
+workers_dev = true
+ai = { binding = "AI" }
