@@ -1,9 +1,28 @@
 import { TranslateService } from '../services/translateService';
 
+const RATE_LIMIT = { windowMs: 60_000, max: 10 };
+const buckets = new Map<string, { count: number; reset: number }>();
+
+function isRateLimited(ip: string): boolean {
+    const now = Date.now();
+    const bucket = buckets.get(ip) ?? { count: 0, reset: now + RATE_LIMIT.windowMs };
+    if (now > bucket.reset) {
+        bucket.count = 0;
+        bucket.reset = now + RATE_LIMIT.windowMs;
+    }
+    bucket.count += 1;
+    buckets.set(ip, bucket);
+    return bucket.count > RATE_LIMIT.max;
+}
+
 /**
  * Cloudflare Worker style router entry. Handles POST /translate.
  */
 export async function handleRoutes(request: Request, env: any): Promise<Response> {
+    const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+    if (isRateLimited(ip)) {
+        return new Response('Too Many Requests', { status: 429 });
+    }
     const url = new URL(request.url);
 
     if (request.method !== 'POST' || url.pathname !== '/translate') {
