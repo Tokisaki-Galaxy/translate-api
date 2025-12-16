@@ -1,6 +1,16 @@
 name = "translate-api"
 main = "src/worker.ts"
 tsconfig = "./tsconfig.json"
-compatibility_date = "2024-12-16"
+compatibility_date = "2025-11-17"
 workers_dev = true
 ai = { binding = "AI" }
+
+[placement]
+mode = "smart"
+
+[observability]
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
