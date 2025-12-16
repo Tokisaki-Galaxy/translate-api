@@ -1,18 +1,20 @@
 import { TranslateService } from '../services/translateService';
+import { RATE_LIMIT_ENABLED, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS } from '../config';
 
-const RATE_LIMIT = { windowMs: 60_000, max: 10 };
 const buckets = new Map<string, { count: number; reset: number }>();
 
 function isRateLimited(ip: string): boolean {
+    if (!RATE_LIMIT_ENABLED) return false;
+
     const now = Date.now();
-    const bucket = buckets.get(ip) ?? { count: 0, reset: now + RATE_LIMIT.windowMs };
+    const bucket = buckets.get(ip) ?? { count: 0, reset: now + RATE_LIMIT_WINDOW_MS };
     if (now > bucket.reset) {
         bucket.count = 0;
-        bucket.reset = now + RATE_LIMIT.windowMs;
+        bucket.reset = now + RATE_LIMIT_WINDOW_MS;
     }
     bucket.count += 1;
     buckets.set(ip, bucket);
-    return bucket.count > RATE_LIMIT.max;
+    return bucket.count > RATE_LIMIT_MAX;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { MODEL_NAME } from '../config';
+import { MODEL_NAME, TOKEN_LIMIT, TOKEN_LIMIT_ENABLED } from '../config';
 
 type AIEnv = { AI: { run: (model: string, inputs: any) => Promise<any> } };
 
@@ -10,8 +10,11 @@ export class TranslateService {
     }
 
     async translateText(text: string, targetLanguage: string, sourceLanguage?: string): Promise<string> {
+        // Cap request size to avoid very long inputs; truncate extra content when enabled.
+        const cappedText = TOKEN_LIMIT_ENABLED ? this.truncateToTokenLimit(text, TOKEN_LIMIT) : text;
+
         // Keep chunks short to avoid model truncation; 250 is safer than 500 for long legal text blocks.
-        const chunks = this.chunkBySentence(text, 250);
+        const chunks = this.chunkBySentence(cappedText, 250);
         const translatedParts: string[] = [];
 
         for (const chunk of chunks) {
@@ -38,7 +41,7 @@ export class TranslateService {
     }
 
     // Simple sentence-based chunking to reduce truncation; merges sentences until maxLength reached.
-        private chunkBySentence(text: string, maxLength: number): string[] {
+    private chunkBySentence(text: string, maxLength: number): string[] {
         const sentences = text
             .split(/(?<=[\.\!\?。！？])/)
             .map(s => s.trim())
@@ -84,5 +87,20 @@ export class TranslateService {
         }
 
         return chunks;
+    }
+
+    // Rough token-based truncation: ASCII chars ~= 0.25 token, non-ASCII ~= 1 token.
+    private truncateToTokenLimit(text: string, limit: number): string {
+        let tokens = 0;
+        let result = '';
+
+        for (const ch of text) {
+            const addition = ch.charCodeAt(0) <= 0x7f ? 0.25 : 1;
+            if (tokens + addition > limit) break;
+            tokens += addition;
+            result += ch;
+        }
+
+        return result;
     }
 }

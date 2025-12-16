@@ -25,6 +25,8 @@ This project is a translation backend built using Cloudflare Workers. It provide
 
 3. Configure your environment variables in `src/config.ts`:
    - Set `MODEL_NAME` (default `@cf/meta/m2m100-1.2b`) if you want to use a different Workers AI model.
+   - Token guard: `TOKEN_LIMIT_ENABLED` (default `true`) and `TOKEN_LIMIT` (default `1000` approx tokens). When enabled, input text is truncated to the first ~1k tokens; the remainder is skipped.
+   - Rate limit: `RATE_LIMIT_ENABLED` (default `true`), `RATE_LIMIT_WINDOW_MS` (default `60000`), `RATE_LIMIT_MAX` (default `10` requests per IP per window). This is an in-memory per-isolate guard; disable or adjust as needed.
 
 Workers AI access:
 - `wrangler.toml` already binds `ai = { binding = "AI" }`; ensure your Cloudflare account has Workers AI enabled.
@@ -69,6 +71,8 @@ The response will contain the translated text.
       "sourceLanguage": "en" // optional, if provided by upstream
    }
    ```
+- **Limits:** when token guard is enabled, only the first ~1000 tokens of `text` are translated; extra content is dropped.
+- **Rate limiting:** when enabled, per-IP in-memory limit of `RATE_LIMIT_MAX` requests per `RATE_LIMIT_WINDOW_MS`; exceeding returns `429`.
 - **Errors:**
    - `400` invalid JSON or missing required fields.
    - `404` path/method not matched.
