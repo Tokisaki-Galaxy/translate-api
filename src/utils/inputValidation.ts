@@ -11,7 +11,8 @@ export function isPureSymbols(text: string): boolean {
     // Remove all whitespace first to check meaningful content
     const trimmed = text.trim();
     
-    // Empty or whitespace-only text is considered pure symbols
+    // Empty or whitespace-only text is treated as "pure symbols" for anti-spam purposes
+    // (i.e., content that shouldn't be translated)
     if (trimmed.length === 0) {
         return true;
     }
@@ -39,9 +40,9 @@ export function isHumanLanguage(text: string, minLength: number = 10): boolean {
     const trimmed = text.trim();
     
     // Very short texts are hard to reliably detect
+    // For anti-spam purposes, we're permissive with short inputs to avoid blocking
+    // legitimate short messages. The primary spam filter (pure symbols) handles most cases.
     if (trimmed.length < minLength) {
-        // For very short inputs, be permissive and assume it might be human language
-        // unless it's pure symbols (which is checked separately)
         return true;
     }
     

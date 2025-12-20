@@ -27,6 +27,7 @@ This project is a translation backend built using Cloudflare Workers. It provide
    - Set `MODEL_NAME` (default `@cf/meta/m2m100-1.2b`) if you want to use a different Workers AI model.
    - Token guard: `TOKEN_LIMIT_ENABLED` (default `true`) and `TOKEN_LIMIT` (default `1000` approx tokens). When enabled, input text is truncated to the first ~1k tokens; the remainder is skipped.
    - Rate limit: `RATE_LIMIT_ENABLED` (default `true`), `RATE_LIMIT_WINDOW_MS` (default `60000`), `RATE_LIMIT_MAX` (default `10` requests per IP per window). This is an in-memory per-isolate guard; disable or adjust as needed.
+   - Anti-spam: The API automatically filters out pure symbols/special characters and non-human language content using the `franc` library (supports 400+ languages). These inputs are returned as-is without translation.
 
 Workers AI access:
 - `wrangler.toml` already binds `ai = { binding = "AI" }`; ensure your Cloudflare account has Workers AI enabled.
@@ -73,6 +74,7 @@ The response will contain the translated text.
    ```
 - **Limits:** when token guard is enabled, only the first ~1000 tokens of `text` are translated; extra content is dropped.
 - **Rate limiting:** when enabled, per-IP in-memory limit of `RATE_LIMIT_MAX` requests per `RATE_LIMIT_WINDOW_MS`; exceeding returns `429`.
+- **Anti-spam:** inputs containing only symbols/special characters or non-human language are automatically returned as-is without translation. This helps prevent spam and reduces unnecessary API calls.
 - **Errors:**
    - `400` invalid JSON or missing required fields.
    - `404` path/method not matched.
@@ -81,7 +83,12 @@ The response will contain the translated text.
 ### Local test via curl
 
 ```bash
+# Normal translation
 curl -X POST "http://127.0.0.1:8787/translate" -H "Content-Type: application/json" -d '{"text":"Hello","targetLanguage":"zh"}'
+
+# Anti-spam: pure symbols return as-is
+curl -X POST "http://127.0.0.1:8787/translate" -H "Content-Type: application/json" -d '{"text":"!@#$%","targetLanguage":"zh"}'
+# Response: {"translatedText":"!@#$%"}
 ```
 
 ## Koreader Integration
