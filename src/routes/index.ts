@@ -57,8 +57,11 @@ export async function handleRoutes(request: Request, env: any): Promise<Response
     const translateService = new TranslateService(env);
 
     try {
-        const translatedText = await translateService.translateText(text, targetLanguage, sourceLanguage);
-        return new Response(JSON.stringify({ translatedText }), {
+        const result = await translateService.translateText(text, targetLanguage, sourceLanguage);
+        return new Response(JSON.stringify({ 
+            translatedText: result.translatedText,
+            modelUsed: result.modelUsed 
+        }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
         });

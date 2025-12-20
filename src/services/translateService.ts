@@ -1,7 +1,12 @@
-import { MODEL_NAME, TOKEN_LIMIT, TOKEN_LIMIT_ENABLED } from '../config';
+import { MODEL_NAME, TOKEN_LIMIT, TOKEN_LIMIT_ENABLED, GROQ_MODEL, SILICONFLOW_MODEL } from '../config';
 import { translateWithGroq, translateWithSiliconFlow, LLMEnv } from './llmService';
 
 type AIEnv = LLMEnv & { AI: { run: (model: string, inputs: any) => Promise<any> } };
+
+export interface TranslationResult {
+    translatedText: string;
+    modelUsed: string;
+}
 
 export class TranslateService {
     private env: AIEnv;
@@ -10,23 +15,29 @@ export class TranslateService {
         this.env = env;
     }
 
-    async translateText(text: string, targetLanguage: string, sourceLanguage?: string): Promise<string> {
+    async translateText(text: string, targetLanguage: string, sourceLanguage?: string): Promise<TranslationResult> {
         // Cap request size to avoid very long inputs; truncate extra content when enabled.
         const cappedText = TOKEN_LIMIT_ENABLED ? this.truncateToTokenLimit(text, TOKEN_LIMIT) : text;
 
         // Try layered translation
         try {
             // Layer 1: Groq (Llama 3.3 70B)
-            return await translateWithGroq(cappedText, targetLanguage, this.env);
+            const result = await translateWithGroq(cappedText, targetLanguage, this.env);
+            console.log(`Translation successful using Groq (${GROQ_MODEL})`);
+            return { translatedText: result, modelUsed: `Groq (${GROQ_MODEL})` };
         } catch (error) {
             console.error('Groq translation failed, falling back to SiliconFlow:', error);
             try {
                 // Layer 2: SiliconFlow (DeepSeek)
-                return await translateWithSiliconFlow(cappedText, targetLanguage, this.env);
+                const result = await translateWithSiliconFlow(cappedText, targetLanguage, this.env);
+                console.log(`Translation successful using SiliconFlow (${SILICONFLOW_MODEL})`);
+                return { translatedText: result, modelUsed: `SiliconFlow (${SILICONFLOW_MODEL})` };
             } catch (error2) {
                 console.error('SiliconFlow translation failed, falling back to Workers AI:', error2);
                 // Layer 3: Workers AI (m2m100)
-                return await this.translateWithWorkersAI(cappedText, targetLanguage, sourceLanguage);
+                const result = await this.translateWithWorkersAI(cappedText, targetLanguage, sourceLanguage);
+                console.log(`Translation successful using Workers AI (${MODEL_NAME})`);
+                return { translatedText: result, modelUsed: `Workers AI (${MODEL_NAME})` };
             }
         }
     }
