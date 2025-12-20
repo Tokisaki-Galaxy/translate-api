@@ -1,6 +1,7 @@
 import { MODEL_NAME, TOKEN_LIMIT, TOKEN_LIMIT_ENABLED } from '../config';
+import { translateWithGroq, translateWithSiliconFlow, LLMEnv } from './llmService';
 
-type AIEnv = { AI: { run: (model: string, inputs: any) => Promise<any> } };
+type AIEnv = LLMEnv & { AI: { run: (model: string, inputs: any) => Promise<any> } };
 
 export class TranslateService {
     private env: AIEnv;
@@ -13,8 +14,26 @@ export class TranslateService {
         // Cap request size to avoid very long inputs; truncate extra content when enabled.
         const cappedText = TOKEN_LIMIT_ENABLED ? this.truncateToTokenLimit(text, TOKEN_LIMIT) : text;
 
+        // Try layered translation
+        try {
+            // Layer 1: Groq (Llama 3.3 70B)
+            return await translateWithGroq(cappedText, targetLanguage, this.env);
+        } catch (error) {
+            console.error('Groq translation failed, falling back to SiliconFlow:', error);
+            try {
+                // Layer 2: SiliconFlow (DeepSeek)
+                return await translateWithSiliconFlow(cappedText, targetLanguage, this.env);
+            } catch (error2) {
+                console.error('SiliconFlow translation failed, falling back to Workers AI:', error2);
+                // Layer 3: Workers AI (m2m100)
+                return await this.translateWithWorkersAI(cappedText, targetLanguage, sourceLanguage);
+            }
+        }
+    }
+
+    private async translateWithWorkersAI(text: string, targetLanguage: string, sourceLanguage?: string): Promise<string> {
         // Keep chunks short to avoid model truncation; 250 is safer than 500 for long legal text blocks.
-        const chunks = this.chunkBySentence(cappedText, 250);
+        const chunks = this.chunkBySentence(text, 250);
         const translatedParts: string[] = [];
 
         for (const chunk of chunks) {
@@ -31,7 +50,7 @@ export class TranslateService {
             const translatedText = (result as any).translated_text || (result as any).translation || (result as any).output;
 
             if (!translatedText) {
-                throw new Error('Translation failed');
+                throw new Error('Workers AI Translation failed');
             }
 
             translatedParts.push(translatedText);
