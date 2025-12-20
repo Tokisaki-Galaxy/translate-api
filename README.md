@@ -1,99 +1,89 @@
 # Cloudflare Worker Translation Backend
 
-This project is a translation backend built using Cloudflare Workers. It provides an API for translating text between different languages. The backend is designed to be lightweight and efficient, leveraging the capabilities of Cloudflare's serverless platform.
+<p align="center">
+  <img src="https://img.shields.io/badge/Cloudflare-Workers-F38020?style=for-the-badge&logo=Cloudflare&logoColor=white" alt="Cloudflare Workers">
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+</p>
+
+[中文文档](README_CN.md)
+
+> [!IMPORTANT]
+> **Public API Endpoint:** `https://translate.api.tokisaki.top/translate` (Free for public use)
+
+This project is a high-performance translation backend built on Cloudflare Workers. It features a layered translation architecture integrating multiple LLMs for maximum reliability and quality.
+
+## 🌟 Features
+
+- **Layered Translation Flow**:
+  1. **Groq (Llama 3.3 70B)**: Primary high-speed, high-quality engine.
+  2. **SiliconFlow (DeepSeek-R1)**: Secondary powerful LLM fallback.
+  3. **Cloudflare Workers AI (m2m100)**: Final fallback to ensure 100% uptime.
+- **Smart Token Truncation**: Automatically truncates long inputs (default 1000 tokens) to prevent abuse.
+- **Native Rate Limiting**: Leverages Cloudflare's Rate Limiting API for precise per-IP throttling.
+- **Anti-Spam Filter**: Automatically detects and skips translation for pure symbols or non-human content.
+- **KOReader Integration**: Includes a drop-in Lua script for seamless e-reader translation.
 
 ## Project Structure
 
-- `src/worker.ts`: Entry point for the Cloudflare Worker, handling incoming requests and routing them to the appropriate services.
-- `src/config.ts`: Contains configuration options such as the default Workers AI model name used by the translation service.
-- `src/services/translateService.ts`: Exports the `TranslateService` class, which includes the `translateText` method for translating text based on the target language.
-- `src/routes/index.ts`: Exports `handleRoutes`, a Cloudflare Worker–style router handling `POST /translate` and validating input.
-- `src/koreader/translator.lua`: Lua script for KOReader, compatible with the original translator module but using the custom backend.
+- `src/worker.ts`: Entry point for the Cloudflare Worker.
+- `src/services/translateService.ts`: Core logic for layered translation and token management.
+- `src/services/llmService.ts`: API wrappers for Groq and SiliconFlow.
+- `src/config.ts`: Configuration for models and limits.
+- `src/koreader/`: Lua scripts for KOReader integration.
 
 ## Setup
 
 1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd cloudflare-worker-translation
+   ```bash
+   git clone https://github.com/Tokisaki-Galaxy/translate-api
+   cd translate-api
    ```
 
 2. Install dependencies:
-   ```
+   ```bash
    npm install
    ```
 
-3. Configure your environment variables in `src/config.ts`:
-   - Set `MODEL_NAME` (default `@cf/meta/m2m100-1.2b`) if you want to use a different Workers AI model.
-   - Token guard: `TOKEN_LIMIT_ENABLED` (default `true`) and `TOKEN_LIMIT` (default `1000` approx tokens). When enabled, input text is truncated to the first ~1k tokens; the remainder is skipped.
-   - Rate limit: `RATE_LIMIT_ENABLED` (default `true`), `RATE_LIMIT_WINDOW_MS` (default `60000`), `RATE_LIMIT_MAX` (default `10` requests per IP per window). This is an in-memory per-isolate guard; disable or adjust as needed.
-   - Anti-spam: The API automatically filters out pure symbols/special characters and non-human language content using the `franc` library (supports 400+ languages). These inputs are returned as-is without translation.
-
-Workers AI access:
-- `wrangler.toml` already binds `ai = { binding = "AI" }`; ensure your Cloudflare account has Workers AI enabled.
-- No external API token is needed when using `env.AI.run` inside the Worker.
-
-4. Run locally with Wrangler (uses `wrangler.toml` with `main = "src/worker.ts"`):
+3. Configure Secrets:
+   You need to set the following secrets in Cloudflare:
+   ```bash
+   npx wrangler secret put GROQ_API_KEY
+   npx wrangler secret put SILICONFLOW_API_KEY
    ```
+
+4. Run locally:
+   ```bash
    npm run start
    ```
-   Wrangler will start a dev server at `http://127.0.0.1:8787` by default.
 
-5. Deploy the Cloudflare Worker:
-   ```
+5. Deploy:
+   ```bash
    npm run deploy
    ```
 
 ## Usage
 
-Once deployed, you can use the translation API by sending a POST request to the worker's endpoint with the following JSON body:
-
-```json
-{
-  "text": "Hello, world!",
-  "targetLanguage": "ja"
-}
-```
-
-The response will contain the translated text.
-
-### HTTP API
-
-- **Endpoint:** `POST /translate`
-- **Headers:** `Content-Type: application/json`
-- **Request body:**
-   - `text` (string, required): source text.
-   - `targetLanguage` (string, required): target language code (e.g. `en`, `zh`, `fr`).
-   - `sourceLanguage` (string, optional): source language code. If omitted/empty, Workers AI will auto-detect.
-- **Response 200 JSON:**
-   ```json
-   {
-      "translatedText": "你好，世界！",
-      "sourceLanguage": "en" // optional, if provided by upstream
-   }
-   ```
-- **Limits:** when token guard is enabled, only the first ~1000 tokens of `text` are translated; extra content is dropped.
-- **Rate limiting:** when enabled, per-IP in-memory limit of `RATE_LIMIT_MAX` requests per `RATE_LIMIT_WINDOW_MS`; exceeding returns `429`.
-- **Anti-spam:** inputs containing only symbols/special characters or non-human language are automatically returned as-is without translation. This helps prevent spam and reduces unnecessary API calls.
-- **Errors:**
-   - `400` invalid JSON or missing required fields.
-   - `404` path/method not matched.
-   - `500` upstream translation failure.
-
-### Local test via curl
-
-```bash
-# Normal translation
-curl -X POST "http://127.0.0.1:8787/translate" -H "Content-Type: application/json" -d '{"text":"Hello","targetLanguage":"zh"}'
-
-# Anti-spam: pure symbols return as-is
-curl -X POST "http://127.0.0.1:8787/translate" -H "Content-Type: application/json" -d '{"text":"!@#$%","targetLanguage":"zh"}'
-# Response: {"translatedText":"!@#$%"}
-```
+### API Endpoint
+- **Method:** `POST /translate`
+- **Body:**
+  ```json
+  {
+    "text": "Hello, world!",
+    "targetLanguage": "zh"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "translatedText": "你好，世界！",
+    "modelUsed": "Groq (llama-3.3-70b-versatile)"
+  }
+  ```
 
 ## Koreader Integration
 
-To use the translation service in KOReader, place `src/koreader/translator.lua` into KOReader (can be used as a drop-in for the original translator). Update `CUSTOM_ENDPOINT` inside the file to your deployed Worker URL. It preserves the original UI/menus and only swaps the network call to POST the same JSON as above.
+[Click This](https://github.com/Tokisaki-Galaxy/kindle-koreader-custom-translator)
 
 ## License
 
