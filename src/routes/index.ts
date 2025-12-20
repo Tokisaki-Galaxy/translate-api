@@ -1,5 +1,6 @@
 import { TranslateService } from '../services/translateService';
 import { RATE_LIMIT_ENABLED, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS } from '../config';
+import { validateTranslationInput } from '../utils/inputValidation';
 
 const buckets = new Map<string, { count: number; reset: number }>();
 
@@ -41,6 +42,16 @@ export async function handleRoutes(request: Request, env: any): Promise<Response
     const { text, targetLanguage, sourceLanguage } = payload ?? {};
     if (!text || !targetLanguage) {
         return new Response('Invalid request: text and targetLanguage are required', { status: 400 });
+    }
+
+    // Anti-spam validation: check for pure symbols and non-human language
+    const validation = validateTranslationInput(text);
+    if (!validation.shouldTranslate) {
+        // Return the original text without translation
+        return new Response(JSON.stringify({ translatedText: validation.text }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     const translateService = new TranslateService(env);
