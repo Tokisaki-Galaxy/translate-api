@@ -1,31 +1,20 @@
 import { TranslateService } from '../services/translateService';
-import { RATE_LIMIT_ENABLED, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS } from '../config';
+import { RATE_LIMIT_ENABLED } from '../config';
 import { validateTranslationInput } from '../utils/inputValidation';
-
-const buckets = new Map<string, { count: number; reset: number }>();
-
-function isRateLimited(ip: string): boolean {
-    if (!RATE_LIMIT_ENABLED) return false;
-
-    const now = Date.now();
-    const bucket = buckets.get(ip) ?? { count: 0, reset: now + RATE_LIMIT_WINDOW_MS };
-    if (now > bucket.reset) {
-        bucket.count = 0;
-        bucket.reset = now + RATE_LIMIT_WINDOW_MS;
-    }
-    bucket.count += 1;
-    buckets.set(ip, bucket);
-    return bucket.count > RATE_LIMIT_MAX;
-}
 
 /**
  * Cloudflare Worker style router entry. Handles POST /translate.
  */
 export async function handleRoutes(request: Request, env: any): Promise<Response> {
     const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
-    if (isRateLimited(ip)) {
-        return new Response('Too Many Requests', { status: 429 });
+
+    if (RATE_LIMIT_ENABLED && env.TRANSLATE_API_RATE_LIMITER) {
+        const { success } = await env.TRANSLATE_API_RATE_LIMITER.limit({ key: ip });
+        if (!success) {
+            return new Response('Too Many Requests', { status: 429 });
+        }
     }
+
     const url = new URL(request.url);
 
     if (request.method !== 'POST' || url.pathname !== '/translate') {

@@ -14,5 +14,6 @@ export const SILICONFLOW_API_URL = 'https://api.siliconflow.cn/v1/chat/completio
 
 // Simple in-memory rate limit (per isolate) for /translate
 export const RATE_LIMIT_ENABLED = true;
-export const RATE_LIMIT_WINDOW_MS = 60_000;
-export const RATE_LIMIT_MAX = 10; // requests per IP per window
+// 以下参数已由 wrangler.toml 接管，可以删除或仅作注释参考
+// export const RATE_LIMIT_WINDOW_MS = 60_000;
+// export const RATE_LIMIT_MAX = 10; 

@@ -3,6 +3,9 @@ import { GROQ_API_URL, GROQ_MODEL, SILICONFLOW_API_URL, SILICONFLOW_MODEL } from
 export interface LLMEnv {
     GROQ_API_KEY: string;
     SILICONFLOW_API_KEY: string;
+    TRANSLATE_API_RATE_LIMITER: {
+        limit: (options: { key: string }) => Promise<{ success: boolean }>;
+    };
 }
 
 async function fetchLLM(url: string, apiKey: string, model: string, text: string, targetLang: string) {
