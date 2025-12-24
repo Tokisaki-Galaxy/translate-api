@@ -3,7 +3,7 @@ export const MODEL_NAME = '@cf/meta/m2m100-1.2b';
 
 // Enforce a per-request token cap (approx) to avoid huge inputs
 export const TOKEN_LIMIT_ENABLED = true;
-export const TOKEN_LIMIT = 1000; // approximate tokens; truncate beyond this
+export const TOKEN_LIMIT = 1500; // approximate tokens; truncate beyond this
 
 // LLM Models API Endpoints
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
