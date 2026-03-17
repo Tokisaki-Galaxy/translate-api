@@ -16,7 +16,7 @@ function isAuthorized(request: Request, env: any): boolean {
     const token = authHeader.slice('Bearer '.length).trim();
     if (!token) return false;
 
-    // Validate UUID v4 format before checking against stored values
+    // Validate UUID format before checking against stored values
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!UUID_RE.test(token)) return false;
 
