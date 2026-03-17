@@ -3,12 +3,45 @@ import { RATE_LIMIT_ENABLED } from '../config';
 import { validateTranslationInput } from '../utils/inputValidation';
 
 /**
+ * Returns true if the request carries a valid pre-authorized UUID that should
+ * bypass rate limiting.  The secret `authorized_uuid` must be a JSON object
+ * whose *values* are the accepted UUIDs, e.g.
+ *   {"test":"3db14426-30d0-4c20-b04b-16149757ccf2","test2":"93eab89b-..."}
+ * The request must supply the UUID as:  Authorization: Bearer <uuid>
+ */
+function isAuthorized(request: Request, env: any): boolean {
+    const authHeader = request.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) return false;
+
+    const token = authHeader.slice('Bearer '.length).trim();
+    if (!token) return false;
+
+    // Validate UUID format before checking against stored values
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(token)) return false;
+
+    const normalizedToken = token.toLowerCase();
+
+    let authorizedUUIDs: Record<string, string>;
+    try {
+        authorizedUUIDs = JSON.parse(env.authorized_uuid ?? '{}');
+    } catch {
+        return false;
+    }
+
+    return Object.keys(authorizedUUIDs).some((k) => {
+        const value = authorizedUUIDs[k];
+        return typeof value === 'string' && value.toLowerCase() === normalizedToken;
+    });
+}
+
+/**
  * Cloudflare Worker style router entry. Handles POST /translate.
  */
 export async function handleRoutes(request: Request, env: any): Promise<Response> {
     const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
 
-    if (RATE_LIMIT_ENABLED && env.TRANSLATE_API_RATE_LIMITER) {
+    if (RATE_LIMIT_ENABLED && env.TRANSLATE_API_RATE_LIMITER && !isAuthorized(request, env)) {
         const { success } = await env.TRANSLATE_API_RATE_LIMITER.limit({ key: ip });
         if (!success) {
             return new Response('Too Many Requests', { status: 429 });
