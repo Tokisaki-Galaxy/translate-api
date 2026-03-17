@@ -20,6 +20,8 @@ function isAuthorized(request: Request, env: any): boolean {
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!UUID_RE.test(token)) return false;
 
+    const normalizedToken = token.toLowerCase();
+
     let authorizedUUIDs: Record<string, string>;
     try {
         authorizedUUIDs = JSON.parse(env.authorized_uuid ?? '{}');
@@ -27,7 +29,10 @@ function isAuthorized(request: Request, env: any): boolean {
         return false;
     }
 
-    return Object.keys(authorizedUUIDs).some((k) => authorizedUUIDs[k] === token);
+    return Object.keys(authorizedUUIDs).some((k) => {
+        const value = authorizedUUIDs[k];
+        return typeof value === 'string' && value.toLowerCase() === normalizedToken;
+    });
 }
 
 /**
